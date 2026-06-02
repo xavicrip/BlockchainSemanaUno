@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DApp · Registro de Certificados — Blockchain DevOps</title>
+    <!-- ethers.js v6 vía CDN: sin paso de compilación, ideal para aprender. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
+    <style>
+      :root {
+        --azul: #1d3a8a;
+        --verde: #15803d;
+        --rojo: #b91c1c;
+        --gris: #f3f4f6;
+      }
+      * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+      body { margin: 0; background: var(--gris); color: #111; }
+      header { background: var(--azul); color: #fff; padding: 1.2rem 2rem; }
+      header h1 { margin: 0; font-size: 1.3rem; }
+      header p { margin: 0.3rem 0 0; opacity: 0.85; font-size: 0.85rem; }
+      main { max-width: 760px; margin: 1.5rem auto; padding: 0 1rem; }
+      .tarjeta { background: #fff; border-radius: 10px; padding: 1.3rem; margin-bottom: 1.2rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+      .tarjeta h2 { margin-top: 0; font-size: 1.05rem; }
+      label { display: block; font-size: 0.85rem; margin: 0.6rem 0 0.2rem; font-weight: 600; }
+      input { width: 100%; padding: 0.6rem; border: 1px solid #d1d5db; border-radius: 6px; }
+      button { margin-top: 0.9rem; background: var(--azul); color: #fff; border: 0; padding: 0.65rem 1.1rem; border-radius: 6px; cursor: pointer; font-weight: 600; }
+      button:hover { opacity: 0.9; }
+      button.secundario { background: #475569; }
+      #estadoConexion { font-size: 0.85rem; }
+      .resultado { margin-top: 0.8rem; padding: 0.8rem; border-radius: 6px; font-size: 0.9rem; word-break: break-all; }
+      .ok { background: #dcfce7; color: var(--verde); }
+      .error { background: #fee2e2; color: var(--rojo); }
+      code { background: #eef; padding: 0.1rem 0.3rem; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>🎓 Registro de Certificados — DApp didáctica</h1>
+      <p>Unidad 1: Blockchain DevOps · UTPL · Caso de estudio sobre Ethereum</p>
+    </header>
+
+    <main>
+      <div class="tarjeta">
+        <h2>1. Conexión</h2>
+        <button id="btnConectar">Conectar MetaMask</button>
+        <p id="estadoConexion">No conectado.</p>
+      </div>
+
+      <div class="tarjeta">
+        <h2>2. Emitir certificado</h2>
+        <label for="nombre">Nombre del estudiante</label>
+        <input id="nombre" placeholder="Ada Lovelace" />
+        <label for="curso">Curso</label>
+        <input id="curso" placeholder="Blockchain DevOps" />
+        <button id="btnEmitir">Emitir certificado</button>
+        <div id="resultadoEmision"></div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>3. Verificar certificado</h2>
+        <label for="hash">Hash del certificado</label>
+        <input id="hash" placeholder="0x..." />
+        <button id="btnVerificar" class="secundario">Verificar</button>
+        <div id="resultadoVerificacion"></div>
+      </div>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
