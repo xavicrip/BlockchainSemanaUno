@@ -66,6 +66,50 @@ repoSemanaUno/
 
 ---
 
+## 🧰 Requisitos de instalación
+
+Esto es lo que necesitas tener instalado en tu máquina **antes** de ejecutar el repo. La guía
+detallada paso a paso para Windows, macOS y Linux está en
+[`guias/01-preparacion-del-entorno.md`](guias/01-preparacion-del-entorno.md).
+
+### Imprescindibles
+
+| Herramienta | Versión | Para qué | Cómo obtenerlo |
+|-------------|---------|----------|----------------|
+| **Node.js + npm** | LTS **20 o 22** | Ejecutar Hardhat, las pruebas y los scripts | [nodejs.org](https://nodejs.org) (o `nvm`) |
+| **Git** | reciente | Clonar el repositorio | [git-scm.com](https://git-scm.com) |
+| **Navegador + MetaMask** | última | Usar la DApp y firmar transacciones | [metamask.io](https://metamask.io) |
+
+> 💡 **No necesitas instalar Solidity, Hardhat, ethers, Solhint ni Prettier a mano.** Todo eso son
+> dependencias del proyecto y se instalan solas con `npm install`. El compilador de Solidity
+> (`solc 0.8.24`) lo descarga Hardhat automáticamente la primera vez que compilas.
+
+### Para servir el frontend (cualquiera de las dos)
+
+Ya tienes una de estas si instalaste Node o si usas macOS/Linux:
+
+- **Node:** `npx serve frontend`
+- **Python 3:** `python3 -m http.server 8000 --directory frontend`
+
+### Opcionales (laboratorio DevSecOps y alternativas)
+
+| Herramienta | Para qué | Cómo obtenerlo |
+|-------------|----------|----------------|
+| **Python 3.8+ y Slither** | Análisis estático de seguridad del contrato (`npm run security:slither`) | `pip install slither-analyzer` |
+| **Foundry / Anvil** | Nodo local alternativo a `npm run node` | `curl -L https://foundry.paradigm.xyz \| bash` y luego `foundryup` |
+
+### Verifica tu instalación
+
+```bash
+node -v          # debe mostrar v20.x o v22.x
+npm -v
+git --version
+```
+
+Si los tres comandos responden con una versión, ya puedes pasar al **Inicio rápido**.
+
+---
+
 ## 🚀 Inicio rápido
 
 > **Requisito recomendado:** Node.js **LTS 20 o 22**. (Funciona con versiones más nuevas, pero
