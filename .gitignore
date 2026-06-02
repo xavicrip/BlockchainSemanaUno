@@ -1,0 +1,29 @@
+# Dependencias
+node_modules/
+
+# Artefactos de compilación de Hardhat
+artifacts/
+cache/
+typechain-types/
+
+# Cobertura
+coverage/
+coverage.json
+
+# Variables de entorno y secretos (NUNCA subir al repositorio - DevSecOps)
+.env
+.env.local
+*.key
+*.pem
+
+# Datos de despliegue generados
+frontend/deployment.json
+
+# Sistema operativo / editores
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# Guía interna para Claude Code (no forma parte del material del curso)
+CLAUDE.md
