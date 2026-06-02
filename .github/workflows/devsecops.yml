@@ -1,0 +1,268 @@
+# =============================================================================
+# Pipeline DevSecOps — Repositorio Didáctico UTPL Blockchain DevOps
+# Unidad 1 · Sección 1.2 Fundamentos DevSecOps
+# =============================================================================
+#
+# PROPÓSITO GENERAL:
+#   Este workflow implementa el principio "shift-left security": integrar los
+#   controles de seguridad lo más temprano posible en el ciclo de desarrollo,
+#   en lugar de dejarlos para el final. Se dispara en tres momentos:
+#     1. Cada push a las ramas principales o de desarrollo.
+#     2. Cada Pull Request hacia main (punto de control antes de fusionar).
+#     3. Semanalmente de forma programada (para detectar vulnerabilidades nuevas
+#        en dependencias aunque no haya cambios en el código).
+#
+# DOCUMENTACIÓN RELACIONADA:
+#   - docs/04-devsecops/01-pipeline-seguro.md  (explica cada job en detalle)
+#   - docs/04-devsecops/03-gestion-de-secretos.md (por qué no hay secretos aquí)
+# =============================================================================
+
+name: DevSecOps — Análisis de Seguridad
+
+on:
+  # Disparar en push a ramas principales y de trabajo
+  push:
+    branches:
+      - main
+      - develop
+      - "feature/**"
+      - "fix/**"
+  # Disparar en Pull Requests hacia main (control de calidad antes de fusionar)
+  pull_request:
+    branches:
+      - main
+  # Análisis semanal programado: lunes a las 08:00 UTC
+  # Detecta vulnerabilidades nuevas en dependencias aunque no haya commits.
+  schedule:
+    - cron: "0 8 * * 1"
+
+# Evitar ejecuciones paralelas redundantes en la misma rama/PR
+concurrency:
+  group: devsecops-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================================
+  # JOB 1 — SAST: Análisis Estático de Smart Contracts con Slither
+  # ===========================================================================
+  #
+  # OBJETIVO DE SEGURIDAD:
+  #   Slither es un framework de análisis estático desarrollado por Trail of Bits
+  #   específicamente para contratos Solidity. Detecta automáticamente patrones
+  #   peligrosos como: reentrancy, uso incorrecto de tx.origin, llamadas no
+  #   verificadas, problemas de visibilidad, variables de estado mal inicializadas,
+  #   y decenas de detectores adicionales. Es SAST (Static Application Security
+  #   Testing) aplicado al mundo on-chain.
+  #
+  #   `continue-on-error: true` — en un entorno didáctico, queremos que los
+  #   estudiantes vean los resultados sin que el pipeline quede completamente
+  #   bloqueado. En producción, este valor debería ser `false`.
+  # ===========================================================================
+  sast-slither:
+    name: "SAST — Slither (Solidity)"
+    runs-on: ubuntu-latest
+    continue-on-error: true # Didáctico: no bloquea; en producción usar false
+
+    steps:
+      # -----------------------------------------------------------------------
+      # Paso 1: Obtener el código fuente del repositorio
+      # -----------------------------------------------------------------------
+      - name: Obtener código fuente
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Historial completo para análisis diferencial
+
+      # -----------------------------------------------------------------------
+      # Paso 2: Instalar Node.js y compilar contratos
+      # Slither necesita el ABI compilado; Hardhat genera los artefactos.
+      # -----------------------------------------------------------------------
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instalar dependencias de Node
+        run: npm ci
+
+      - name: Compilar contratos (genera artefactos para Slither)
+        run: npx hardhat compile
+
+      # -----------------------------------------------------------------------
+      # Paso 3: Ejecutar Slither con la acción oficial de Crytic/Trail of Bits
+      # La acción instala automáticamente Python, solc-select y slither-analyzer.
+      # sarif: true — genera un reporte en formato SARIF que GitHub puede
+      # mostrar en la pestaña "Security > Code scanning alerts".
+      # -----------------------------------------------------------------------
+      - name: Análisis estático con Slither
+        uses: crytic/slither-action@v0.4.0
+        id: slither
+        with:
+          target: "contracts/"
+          slither-args: "--exclude-dependencies"
+          sarif: results.sarif
+          fail-on: none # Didáctico: reporta sin fallar el job
+
+      # -----------------------------------------------------------------------
+      # Paso 4 (opcional): Subir el reporte SARIF a GitHub Code Scanning
+      # Requiere que el repositorio tenga habilitado GitHub Advanced Security
+      # (disponible en repos públicos o con licencia GH Enterprise/Teams).
+      # -----------------------------------------------------------------------
+      - name: Subir reporte SARIF a GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() # Ejecutar incluso si Slither encontró hallazgos
+        with:
+          sarif_file: results.sarif
+        continue-on-error: true # No fallar si Code Scanning no está habilitado
+
+  # ===========================================================================
+  # JOB 2 — Lint de Seguridad con Solhint
+  # ===========================================================================
+  #
+  # OBJETIVO DE SEGURIDAD:
+  #   Solhint es un linter específico para Solidity que combina reglas de estilo
+  #   con reglas de seguridad. Extiende `solhint:recommended` (ver .solhint.json),
+  #   lo que activa reglas como:
+  #     - avoid-call-value: alerta sobre el uso de .call{value:}
+  #     - no-tx-origin: prohíbe el uso inseguro de tx.origin
+  #     - reentrancy: detecta patrones de reentrancy
+  #     - func-visibility: exige visibilidad explícita en funciones
+  #   Es la primera línea de defensa: rápido, sin instalación extra, integrado
+  #   como script npm del proyecto (npm run lint:sol).
+  # ===========================================================================
+  lint-solhint:
+    name: "Lint de Seguridad — Solhint"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obtener código fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # npm ci instala las versiones exactas del package-lock.json,
+      # garantizando reproducibilidad (principio DevSecOps de builds deterministas).
+      - name: Instalar dependencias (reproducible con npm ci)
+        run: npm ci
+
+      # Ejecuta el script definido en package.json:
+      # "lint:sol": "solhint 'contracts/**/*.sol'"
+      # La configuración en .solhint.json extiende solhint:recommended y
+      # agrega reglas de seguridad específicas del proyecto.
+      - name: Ejecutar Solhint sobre contracts/
+        run: npm run lint:sol
+
+  # ===========================================================================
+  # JOB 3 — SCA: Análisis de Composición de Software con npm audit
+  # ===========================================================================
+  #
+  # OBJETIVO DE SEGURIDAD:
+  #   SCA (Software Composition Analysis) analiza las dependencias de terceros
+  #   en busca de CVEs (vulnerabilidades públicamente conocidas). Aunque el
+  #   contrato Solidity es el activo principal, el toolchain de desarrollo
+  #   (Hardhat, plugins, solhint) también puede introducir vulnerabilidades
+  #   que comprometan el entorno de compilación o despliegue.
+  #   `--audit-level=high` solo falla si hay vulnerabilidades de severidad
+  #   alta o crítica, evitando ruido por vulnerabilidades de severidad baja
+  #   en herramientas de desarrollo.
+  #   `continue-on-error: true` — didáctico; en producción usar false.
+  # ===========================================================================
+  sca-npm-audit:
+    name: "SCA — npm audit (dependencias)"
+    runs-on: ubuntu-latest
+    continue-on-error: true # Didáctico: reporta sin bloquear
+
+    steps:
+      - name: Obtener código fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # npm audit consulta la base de datos de vulnerabilidades de npm Registry.
+      # Solo reporta vulnerabilidades de nivel HIGH o CRITICAL.
+      # El flag --json permite parsear la salida en scripts de automatización.
+      - name: Auditar dependencias (nivel HIGH+)
+        run: npm audit --audit-level=high --json || npm audit --audit-level=high
+
+  # ===========================================================================
+  # JOB 4 — Secret Scanning: Detección de Secretos con Gitleaks
+  # ===========================================================================
+  #
+  # OBJETIVO DE SEGURIDAD:
+  #   El mayor riesgo en un proyecto blockchain no es un bug en el contrato;
+  #   es filtrar una clave privada al repositorio. Una private key expuesta en
+  #   GitHub significa pérdida inmediata e irreversible de los fondos asociados,
+  #   ya que la blockchain es pública y permanente. Gitleaks escanea TODO el
+  #   historial de git (no solo el commit actual) en busca de:
+  #     - Claves privadas de Ethereum (0x + 64 hex)
+  #     - API keys de Alchemy, Infura, Etherscan
+  #     - Claves AWS, tokens GitHub, etc.
+  #   Es la salvaguarda final antes de que un secreto llegue a main.
+  # ===========================================================================
+  secret-scanning-gitleaks:
+    name: "Secret Scanning — Gitleaks"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obtener código fuente (historial completo)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # CRÍTICO: escanear TODO el historial de git, no solo HEAD
+
+      # La acción oficial de Gitleaks escanea el repo completo con reglas
+      # predefinidas para detectar patrones de secretos. Falla el job si
+      # encuentra algún secreto, bloqueando el merge/push.
+      # Ver documentación: docs/04-devsecops/03-gestion-de-secretos.md
+      - name: Escanear secretos con Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ===========================================================================
+  # JOB 5 — Tests de Seguridad: Suite de Pruebas con Cobertura
+  # ===========================================================================
+  #
+  # OBJETIVO DE SEGURIDAD:
+  #   Las pruebas automatizadas son parte del pipeline de seguridad: verifican
+  #   que el control de acceso funciona correctamente (un emisor no autorizado
+  #   no puede emitir certificados), que las validaciones de entrada rechazan
+  #   datos inválidos (dirección cero), y que los eventos de auditoría se
+  #   emiten correctamente. La cobertura de código mide qué porcentaje de las
+  #   ramas del contrato están cubiertas por las pruebas.
+  # ===========================================================================
+  tests-cobertura:
+    name: "Tests + Cobertura de Seguridad"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obtener código fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Ejecutar suite completa de pruebas
+        run: npm test
+
+      # hardhat-coverage instrumenta el bytecode del contrato para medir
+      # qué líneas y ramas del contrato Solidity son ejercidas por los tests.
+      - name: Generar reporte de cobertura
+        run: npm run coverage
+        continue-on-error: true # La cobertura puede fallar sin romper el gate
