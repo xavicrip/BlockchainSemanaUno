@@ -60,7 +60,6 @@ repoSemanaUno/
 │   ├── 04-devsecops/                    🔒 Práctica de seguridad
 │   └── 05-nube/                         ☁️ Arquitectura en la nube e IaC
 ├── guias/                               🎓 Guías paso a paso para el estudiante
-├── plan.md                              Plan general de la solución
 └── README.md                            Este archivo
 ```
 
@@ -214,8 +213,7 @@ eventos de auditoría) que se analizan en
 
 Este material se elaboró con un **equipo de agentes inteligentes especializados**, cada uno
 responsable de un área (investigación, arquitectura/diseño, DevOps, DevSecOps, nube y guías),
-coordinados por un agente orquestador que construyó y validó el núcleo técnico. El plan completo
-está en [`plan.md`](plan.md).
+coordinados por un agente orquestador que construyó y validó el núcleo técnico.
 
 ---
 
