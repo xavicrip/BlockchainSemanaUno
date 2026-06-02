@@ -23,7 +23,9 @@ module.exports = {
   },
   networks: {
     // Red local en memoria (por defecto al correr pruebas).
-    hardhat: {},
+    // chainId 31337 es el valor estándar de Hardhat y Anvil. Configúralo igual
+    // en MetaMask al crear la red local.
+    hardhat: { chainId: 31337 },
     // Nodo local persistente: `npm run node`.
     localhost: {
       url: "http://127.0.0.1:8545",
