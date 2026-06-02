@@ -9,6 +9,15 @@
 
 let contrato; // Instancia del contrato conectada al firmante (signer).
 
+// Red local. chainId 0x7a69 = 31337, el valor estándar de Hardhat y Anvil
+// (debe coincidir con hardhat.config.js).
+const RED_LOCAL = {
+  chainId: "0x7a69",
+  chainName: "Hardhat Local",
+  rpcUrls: ["http://127.0.0.1:8545"],
+  nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+};
+
 const $ = (id) => document.getElementById(id);
 
 function mostrar(elemento, mensaje, tipo = "ok") {
@@ -26,6 +35,36 @@ async function cargarDespliegue() {
   return respuesta.json();
 }
 
+/**
+ * Pide a MetaMask agregar (y cambiar a) la red local de Hardhat.
+ * Usa wallet_addEthereumChain: evita tener que escribir los datos a mano.
+ */
+async function agregarRedLocal() {
+  if (!window.ethereum) {
+    return mostrar($("estadoConexion"), "MetaMask no está instalado.", "error");
+  }
+  const RED = RED_LOCAL;
+  try {
+    // Primero intenta cambiar; si la red no existe, MetaMask lanza 4902.
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: RED.chainId }],
+    });
+    mostrar($("estadoConexion"), "✅ Cambiado a la red Hardhat Local.", "ok");
+  } catch (e) {
+    if (e.code === 4902 || (e.data && e.data.originalError && e.data.originalError.code === 4902)) {
+      try {
+        await window.ethereum.request({ method: "wallet_addEthereumChain", params: [RED] });
+        mostrar($("estadoConexion"), "✅ Red Hardhat Local agregada. Ahora pulsa ② Conectar.", "ok");
+      } catch (e2) {
+        mostrar($("estadoConexion"), `Error al agregar la red: ${e2.message}`, "error");
+      }
+    } else {
+      mostrar($("estadoConexion"), `Error: ${e.message}`, "error");
+    }
+  }
+}
+
 /** Conecta con MetaMask y prepara la instancia del contrato. */
 async function conectar() {
   if (!window.ethereum) {
@@ -34,6 +73,26 @@ async function conectar() {
   }
   try {
     const despliegue = await cargarDespliegue();
+
+    // Verifica que MetaMask esté en la red local; si no, intenta cambiarla.
+    const chainActual = await window.ethereum.request({ method: "eth_chainId" });
+    if (chainActual !== RED_LOCAL.chainId) {
+      mostrar(
+        $("estadoConexion"),
+        `⚠️ Estás en la red incorrecta (chainId ${chainActual}). Cambiando a la red local…`,
+        "error"
+      );
+      await agregarRedLocal();
+      const chainTrasCambio = await window.ethereum.request({ method: "eth_chainId" });
+      if (chainTrasCambio !== RED_LOCAL.chainId) {
+        return mostrar(
+          $("estadoConexion"),
+          "❌ No se pudo cambiar a la red local. Selecciónala manualmente en MetaMask (Anvil Local) y reintenta.",
+          "error"
+        );
+      }
+    }
+
     const provider = new ethers.BrowserProvider(window.ethereum);
     await provider.send("eth_requestAccounts", []);
     const signer = await provider.getSigner();
@@ -101,6 +160,7 @@ async function verificar() {
   }
 }
 
+$("btnRed").addEventListener("click", agregarRedLocal);
 $("btnConectar").addEventListener("click", conectar);
 $("btnEmitir").addEventListener("click", emitir);
 $("btnVerificar").addEventListener("click", verificar);
