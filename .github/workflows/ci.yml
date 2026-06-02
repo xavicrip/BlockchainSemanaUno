@@ -1,0 +1,162 @@
+# =============================================================================
+# Workflow de Integración Continua (CI) — DApp Registro de Certificados
+# Curso: Blockchain DevOps · UTPL · Unidad 1, sección 1.1
+# =============================================================================
+#
+# PROPÓSITO DIDÁCTICO
+# -------------------
+# Este archivo define el pipeline de CI que se ejecuta automáticamente en
+# GitHub Actions cada vez que alguien sube código o abre un Pull Request.
+# Automatiza tres pilares de calidad:
+#   1. Lint   → el código Solidity respeta las convenciones del equipo.
+#   2. Build  → el contrato compila sin errores.
+#   3. Test   → las 12 pruebas automatizadas pasan (comportamiento correcto).
+# Un cuarto paso opcional calcula la COBERTURA de pruebas.
+#
+# LECTURA SUGERIDA
+# ----------------
+# Lee este archivo de arriba abajo siguiendo los comentarios.
+# Consulta docs/03-devops/02-pipeline-github-actions.md para explicación
+# detallada sección por sección.
+# =============================================================================
+
+name: CI — Integración Continua  # Nombre visible en la pestaña "Actions" de GitHub
+
+# -----------------------------------------------------------------------------
+# SECCIÓN 1 — DISPARADORES (triggers)
+# Cuándo se activa este workflow.
+# -----------------------------------------------------------------------------
+on:
+  push:
+    branches:
+      - main     # Rama principal de producción
+      - master   # Alias histórico de la rama principal
+  pull_request:
+    branches:
+      - main
+      - master
+
+# -----------------------------------------------------------------------------
+# SECCIÓN 2 — PERMISOS MÍNIMOS (principio de mínimo privilegio)
+# El runner solo necesita leer el repositorio. No necesita escribir ni
+# crear releases. Declarar permisos explícitos es una buena práctica DevSecOps.
+# -----------------------------------------------------------------------------
+permissions:
+  contents: read
+
+# -----------------------------------------------------------------------------
+# SECCIÓN 3 — JOBS (trabajos)
+# Cada job es un conjunto de steps que corre en una máquina virtual limpia.
+# Los jobs se pueden ejecutar en paralelo o de forma secuencial (needs:).
+# -----------------------------------------------------------------------------
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # JOB 1: ci-pipeline
+  # Pasos principales: instalar → lint → compilar → probar
+  # ---------------------------------------------------------------------------
+  ci-pipeline:
+    name: Lint · Compilar · Probar  # Nombre legible en la interfaz de GitHub
+    runs-on: ubuntu-latest           # Sistema operativo del runner (VM gratuita de GitHub)
+
+    steps:
+
+      # -----------------------------------------------------------------------
+      # PASO 1 — Checkout
+      # Descarga el código del repositorio en la máquina virtual del runner.
+      # Sin este paso, el runner no tiene los archivos del proyecto.
+      # -----------------------------------------------------------------------
+      - name: Descargar código fuente
+        uses: actions/checkout@v4  # Acción oficial de GitHub (versión 4, LTS)
+
+      # -----------------------------------------------------------------------
+      # PASO 2 — Setup Node.js
+      # Instala la versión 20 LTS de Node.js (la misma que se usa en desarrollo).
+      # La opción "cache: npm" guarda la carpeta ~/.npm entre ejecuciones del
+      # workflow para acelerar instalaciones futuras.
+      # -----------------------------------------------------------------------
+      - name: Configurar Node.js 20 LTS (con caché npm)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"   # Node 20 LTS — versión recomendada en plan.md
+          cache: "npm"         # Activa la caché automática de paquetes npm
+
+      # -----------------------------------------------------------------------
+      # PASO 3 — Instalar dependencias
+      # "npm ci" (Clean Install) es la variante de CI/CD de "npm install":
+      #   - Lee package-lock.json y NO lo modifica (instalación reproducible).
+      #   - Falla si package-lock.json no está sincronizado con package.json.
+      #   - Borra node_modules antes de instalar (entorno limpio garantizado).
+      # -----------------------------------------------------------------------
+      - name: Instalar dependencias (npm ci)
+        run: npm ci
+
+      # -----------------------------------------------------------------------
+      # PASO 4 — Lint Solidity
+      # Ejecuta Solhint sobre todos los archivos .sol del directorio contracts/.
+      # Si hay violaciones de estilo o seguridad, el paso falla y detiene el
+      # pipeline. Esto garantiza que el código siga los estándares del equipo.
+      # Script equivalente: npm run lint:sol
+      # -----------------------------------------------------------------------
+      - name: Lint Solidity (Solhint)
+        run: npm run lint:sol
+
+      # -----------------------------------------------------------------------
+      # PASO 5 — Compilar contratos
+      # Hardhat compila los archivos .sol con el compilador solc 0.8.24.
+      # Genera artefactos en artifacts/ (ABI + bytecode).
+      # Si hay errores de sintaxis o tipos, el pipeline falla aquí.
+      # Script equivalente: npm run compile
+      # -----------------------------------------------------------------------
+      - name: Compilar contratos Solidity
+        run: npm run compile
+
+      # -----------------------------------------------------------------------
+      # PASO 6 — Ejecutar pruebas automatizadas
+      # Corre las 12 pruebas (Mocha + Chai) sobre la red Hardhat en memoria.
+      # No se necesita un nodo externo: Hardhat levanta una EVM temporal.
+      # Si cualquier prueba falla, el paso falla y el pipeline queda en rojo.
+      # Script equivalente: npm test
+      # -----------------------------------------------------------------------
+      - name: Ejecutar pruebas automatizadas (Mocha + Chai)
+        run: npm test
+
+  # ---------------------------------------------------------------------------
+  # JOB 2: coverage
+  # Calcula la cobertura de pruebas (qué porcentaje del código está cubierto).
+  # Se ejecuta solo si el job principal (ci-pipeline) termina con éxito.
+  #
+  # IMPORTANTE: Este job usa "continue-on-error: true" porque la cobertura
+  # puede fallar ocasionalmente por razones de entorno (timeouts, bugs de la
+  # herramienta) sin que eso indique un problema real en el código. En un
+  # proyecto maduro se elimina esa bandera y se establece un umbral mínimo.
+  # ---------------------------------------------------------------------------
+  coverage:
+    name: Cobertura de pruebas (hardhat coverage)
+    runs-on: ubuntu-latest
+    needs: ci-pipeline           # Espera a que el job anterior termine OK
+    continue-on-error: true      # No rompe el pipeline global si falla
+
+    steps:
+
+      - name: Descargar código fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20 LTS (con caché npm)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instalar dependencias (npm ci)
+        run: npm ci
+
+      # -----------------------------------------------------------------------
+      # PASO ÚNICO DEL JOB — Calcular cobertura
+      # "hardhat coverage" instrumenta el contrato e informa el porcentaje de
+      # líneas, ramas y funciones ejecutadas por las pruebas.
+      # El reporte aparece en el log de este step.
+      # Script equivalente: npm run coverage
+      # -----------------------------------------------------------------------
+      - name: Calcular cobertura de código
+        run: npm run coverage
