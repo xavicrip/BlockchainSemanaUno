@@ -177,6 +177,7 @@ contract RegistroCertificados {
         returns (bool valido, Certificado memory cert)
     {
         cert = certificados[hashCertificado];
+        // Devolvemos tanto el indicador de validez como todos los datos del certificado.
         valido = cert.existe && !cert.revocado;
     }
 }
