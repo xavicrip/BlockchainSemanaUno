@@ -1,0 +1,35 @@
+# =============================================================================
+# Configuración de Gitleaks — Repositorio Didáctico UTPL Blockchain DevOps
+# =============================================================================
+#
+# PROPÓSITO:
+#   Gitleaks escanea el historial de git en busca de secretos (claves privadas,
+#   API keys, etc.). Por defecto detecta, por entropía, las CLAVES PRIVADAS
+#   PÚBLICAS DE HARDHAT/ANVIL que este curso documenta a propósito en las guías.
+#
+#   Esas claves derivan del mnemónico de prueba estándar
+#   ("test test test ... junk"): son IDÉNTICAS para todo el mundo, solo sirven
+#   en redes locales y NO protegen ningún fondo real. Documentarlas es parte del
+#   material didáctico (ver guias/02 y docs/04-devsecops/03).
+#
+#   Triar y suprimir falsos positivos CON JUSTIFICACIÓN es una práctica DevSecOps
+#   legítima. Aquí ponemos en allowlist únicamente esos valores públicos conocidos;
+#   cualquier OTRA clave privada real seguirá siendo detectada y bloqueará el push.
+# =============================================================================
+
+title = "Gitleaks - Repositorio Didáctico UTPL Blockchain"
+
+[extend]
+# Partimos del conjunto de reglas por defecto de Gitleaks y solo añadimos la
+# allowlist; no relajamos ninguna otra detección.
+useDefault = true
+
+[allowlist]
+description = "Claves de prueba PÚBLICAS de Hardhat/Anvil (mnemónico estándar) usadas como ejemplo en la documentación del curso."
+# Coincide contra el secreto detectado: solo estas claves conocidas se ignoran.
+regexes = [
+  # Cuenta #0 del mnemónico de prueba estándar de Hardhat/Anvil.
+  '''0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80''',
+  # Cuenta #1 del mnemónico de prueba estándar de Hardhat/Anvil.
+  '''0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d''',
+]
