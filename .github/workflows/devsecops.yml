@@ -24,13 +24,15 @@ on:
   push:
     branches:
       - main
+      - master # Rama por defecto de este repositorio
       - develop
       - "feature/**"
       - "fix/**"
-  # Disparar en Pull Requests hacia main (control de calidad antes de fusionar)
+  # Disparar en Pull Requests hacia las ramas principales (control de calidad antes de fusionar)
   pull_request:
     branches:
       - main
+      - master
   # Análisis semanal programado: lunes a las 08:00 UTC
   # Detecta vulnerabilidades nuevas en dependencias aunque no haya commits.
   schedule:
